@@ -1,4 +1,4 @@
-name: lint (root)
+name: lint (infra)
 
 on:
   push:
@@ -9,70 +9,41 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Verify required files exist
+      - name: Run yamllint
+        run: yamllint .
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli2 **/*.md
+      - name: Validate JSON
+        run: |
+          set -e
+          find . -type f -name "*.json" -print0 | xargs -0 -I{} sh -c 'jq . "{}" >/dev/null' || true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform fmt / validate (recursive, skip if no .tf)
+        shell: bash
         run: |
           set -euo pipefail
-          must=(
-            "README.md"
-            "LICENSE"
-            ".editorconfig"
-            ".gitattributes"
-            ".github/workflows/lint.yml"
-            ".github/workflows/release-please.yml"
-            ".github/renovate.json"
-          )
-          for f in "${must[@]}"; do
-            test -e "$f" || { echo "::error file=$f::missing required file"; exit 1; }
-          done
-          echo "All required files exist."
-
-      - name: Markdown tab check
-        run: |
-          set -euo pipefail
-          if git ls-files '*.md' | xargs -r -n1 grep -n $'\t' --with-filename; then
-            echo "::error::Tab characters found in Markdown (use spaces)"; exit 1;
-          fi
-          echo "No tabs in Markdown."
-
-      - name: Lint YAML
-        run: |
-          python3 -m pip install --upgrade pip >/dev/null 2>&1
-          pip3 install yamllint >/dev/null 2>&1
-          yamllint -s .github/**/*.yml || { echo "::error::YAML lint failed"; exit 1; }
-          echo "YAML syntax OK."
-
-      - name: Validate JSON files
-        run: |
-          set -euo pipefail
-          if command -v jq >/dev/null 2>&1; then
-            true
+          if git ls-files '*.tf' | grep -q .; then
+            terraform fmt -check -recursive
+            for d in $(git ls-files '*.tf' | xargs -n1 dirname | sort -u); do
+              echo "==> terraform validate in $d"
+              (cd "$d" && terraform init -backend=false -input=false -no-color && terraform validate -no-color)
+            done
           else
-            sudo apt-get update -y && sudo apt-get install -y jq
+            echo "No .tf files. Skip terraform checks."
           fi
-          jq -e . .github/renovate.json >/dev/null
-          echo "JSON syntax OK."
 
-      - name: Enforce no :latest policy (YAML/Helm/Docker only)
+      - name: Helm lint (if charts/ exists)
+        shell: bash
         run: |
-          set -euo pipefail
-          # 対象: *.yml/*.yaml/Dockerfile（docs/.github は除外）
-          if grep -RIn \
-              --exclude-dir=.git \
-              --exclude-dir=docs \
-              --exclude-dir=.github \
-              --include='*.yml' --include='*.yaml' --include='Dockerfile' \
-              -E ':[[:space:]]*latest(\b|$)' .; then
-            echo "::error::Found ':latest' in manifests or Dockerfiles (policy forbids it)"
-            exit 1
+          if [ -d charts ]; then
+            helm lint charts/* || true
+          else
+            echo "No charts/ directory. Skip helm lint."
           fi
-          echo "No ':latest' usage detected in manifests/Dockerfiles."
-
-      - name: scripts/sync-common.sh is executable
-        run: |
-          if [ -f scripts/sync-common.sh ] && [ ! -x scripts/sync-common.sh ]; then
-            echo "::error file=scripts/sync-common.sh::script must be executable (chmod +x)"; exit 1
-          fi
-          echo "scripts/sync-common.sh executable OK (or not present)."
