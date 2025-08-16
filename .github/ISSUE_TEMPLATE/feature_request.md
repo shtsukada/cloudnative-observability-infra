@@ -1,3 +1,5 @@
+# Feature request
+
 ---
 name: Feature request
 about: 機能追加のリクエスト
@@ -10,11 +12,11 @@ labels: enhancement
 
 ### 要件
 
-- [ ] 
+- [ ]
 
 ### 受け入れ基準
 
-- [ ] 
+- [ ]
 
 ### 影響範囲
 

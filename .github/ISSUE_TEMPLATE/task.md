@@ -1,3 +1,5 @@
+# task
+
 ---
 name: Task
 about: 作業タスク
@@ -10,7 +12,7 @@ labels: task
 
 ### 完了条件
 
-- [ ] 
+- [ ]
 
 ### 備考
 
