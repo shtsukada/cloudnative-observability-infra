@@ -1,5 +1,11 @@
 # cloudnative-observability-infra
 
+![status](https://img.shields.io/badge/status-WIP-yellow)
+[![lint](https://github.com/shtsukada/cloudnative-observability-infra/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/shtsukada/cloudnative-observability-infra/actions/workflows/lint.yml)
+[![license](https://img.shields.io/github/license/shtsukada/cloudnative-observability-infra)](./LICENSE)
+![Terraform](https://img.shields.io/badge/Terraform-1.9%2B-blue)
+![Helm](https://img.shields.io/badge/Helm-3.12%2B-blue)
+
 EKS/Terraform + GitOps ブートストラップ環境を提供するリポジトリです。
 
 ## 成果物
