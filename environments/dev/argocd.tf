@@ -9,15 +9,15 @@ resource "kubernetes_namespace" "argocd" {
 }
 
 resource "helm_release" "argocd" {
-  provider = helm.eks
-  name = "argocd"
-  namespace = kubernetes_namespace.argocd.metadata[0].name
-  repository = "https://argoproj.github.io/argo-helm"
-  chart = "argo-cd"
-  version = "8.3.0"
+  provider         = helm.eks
+  name             = "argocd"
+  namespace        = kubernetes_namespace.argocd.metadata[0].name
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = "8.3.0"
   create_namespace = false
-  cleanup_on_fail = true
-  timeout = 600
+  cleanup_on_fail  = true
+  timeout          = 600
 
   values = [<<-YAML
     global: {}
