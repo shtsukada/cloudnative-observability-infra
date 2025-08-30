@@ -24,7 +24,7 @@ variable "azs" {
   description = "Availability Zones to use"
   type        = list(string)
   # ap-northeast-1 の3AZ例（アカウントで利用可なAZに合わせて調整可）
-  default     = ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"]
+  default = ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"]
 }
 
 variable "public_subnets" {
