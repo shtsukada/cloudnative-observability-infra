@@ -1,0 +1,128 @@
+name: Terraform CI (fmt/validate/plan)
+
+on: 
+  pull_request: 
+    branches: [ main ]
+    paths: 
+      - 'environments/dev/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch: {}
+
+permissions: 
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency: 
+  group: terraform-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/dev
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.x
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
+          aws-region: ap-northeast-1
+
+      - name: Terraform fmt (check)
+        id: fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false -no-color
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan (dev)
+        id: plan
+        run: |
+          terraform plan -no-color -out=plan.out | tee plan_stdout.txt
+          terraform show -no-color plan.out > plan.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-dev
+          path: |
+            environments/dev/plan.out
+            environments/dev/plan.txt
+            environments/dev/plan_stdout.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Comment plan summary to PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'environments/dev/plan.txt';
+            const body = fs.readFileSync(path, 'utf8');
+
+            // うるさくなりすぎないよう、先頭1000行に抑制
+            const lines = body.split('\n').slice(0, 1000).join('\n');
+            const comment = [
+              '### Terraform plan (dev)',
+              '',
+              '```\n' + lines + '\n```',
+              '',
+              '> フルログや plan.out は Actions の Artifacts から参照できます。'
+            ].join('\n');
+
+            // 既存の自分のコメントがあれば更新
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const marker = 'Terraform plan (dev)';
+            const mine = comments.find(c => c.user.type === 'Bot' && c.body && c.body.includes(marker));
+
+            if (mine) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: mine.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Fail if any step failed
+        if: |
+          steps.fmt.outcome != 'success' ||
+          steps.init.outcome != 'success' ||
+          steps.validate.outcome != 'success' ||
+          steps.plan.outcome != 'success'
+        run: |
+          echo "::error::Terraform CI failed (fmt/init/validate/plan check)."
+          exit 1
