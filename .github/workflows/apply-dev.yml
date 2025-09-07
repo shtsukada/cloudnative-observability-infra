@@ -35,7 +35,7 @@ jobs:
           terraform_version: 1.9.x
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
           aws-region: ap-northeast-1
