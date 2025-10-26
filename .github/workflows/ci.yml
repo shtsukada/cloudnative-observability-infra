@@ -62,7 +62,7 @@ jobs:
           terraform show -no-color plan.out > plan.txt
 
       - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: tfplan-dev
           path: |
